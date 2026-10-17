@@ -59,12 +59,10 @@
 
   /* ---------- Clocks ---------- */
   const fmt = (tz, opts = {}) => new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz, ...opts }).format(new Date());
-  const hdr = $('#hdrClock span');
   const cities = [['Dubai · RAK', 'Asia/Dubai'], ['London', 'Europe/London'], ['New York', 'America/New_York'], ['Sydney', 'Australia/Sydney']];
   const clocksEl = $('#clocks');
   clocksEl.innerHTML = cities.map(([n, tz]) => `<div>${n}<b data-tz="${tz}">--:--</b></div>`).join('');
   const updClocks = () => {
-    hdr.textContent = 'Local ' + new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
     $$('[data-tz]').forEach(b => (b.textContent = fmt(b.dataset.tz)));
   };
   updClocks(); setInterval(updClocks, 15000);
