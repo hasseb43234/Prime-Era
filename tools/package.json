@@ -1,7 +1,7 @@
 {
   "name": "prime-era-site",
   "private": true,
-  "description": "Prime Era website. Edit files in src/, run `npm run build` to regenerate the minified files in assets/.",
+  "description": "Prime Era website. Edit files in ../src/, run `npm run build` here to regenerate the minified files in assets/.",
   "scripts": { "build": "node build.mjs" },
   "devDependencies": { "esbuild": "^0.25.0" }
 }
