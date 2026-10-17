@@ -11,7 +11,7 @@
 (() => {
   'use strict';
   const CONFIG = {
-    endpoint: '/api/book',               // our booking API (api/book.js)
+    endpoint: ((window.PE_API_BASE || '').replace(/\/+$/, '')) + '/api/book',   // our booking API; PE_API_BASE (set in booking.html) is empty when the API is on this same site
     email: 'info@primeera.us',
     teamTz: 'Asia/Dubai',               // Ras Al Khaimah — all slots are defined in this zone (UTC+4, no DST)
     teamLabel: 'Dubai',

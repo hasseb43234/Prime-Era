@@ -3,7 +3,7 @@
    POST /api/book  → stores a booking                                (JSON body)  */
 'use strict';
 const store = require('./_lib/store');
-const { send, ip, body, isJson } = require('./_lib/http');
+const { send, ip, body, isJson, cors } = require('./_lib/http');
 
 const TOPICS = ['Marketplace management', 'Wholesale sourcing', 'White & private label', 'Dropshipping', 'Lead generation',
   'Cold calling & appointment setting', 'Ads, content & design', 'Just a question'];
@@ -49,6 +49,7 @@ async function notify(b) {
 
 module.exports = async function handler(req, res) {
   try {
+    if (cors(req, res)) return;
     if (req.method === 'GET') {
       if (store.mode() === 'none') return send(res, 200, { booked: [], storage: false });
       return send(res, 200, { booked: await store.bookedSlots(), storage: true });
