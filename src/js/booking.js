@@ -2,16 +2,16 @@
    BOOKING — free strategy call scheduler
    Topic → time → details → confirmation.
 
-   To receive bookings automatically, put a form endpoint
-   (e.g. a Formspree / Web3Forms / your own API URL) in
-   CONFIG.endpoint. Without one, the booking is sent by email
-   from the visitor's own mail app (mailto) — nothing is lost,
-   but it needs one extra click.
+   Bookings are saved by our own API (/api/book) and show up in
+   the admin portal (/admin/). Times that are already booked are
+   greyed out. If the API is unreachable, the booking falls back
+   to an email the visitor sends from their own mail app, so no
+   request is ever lost.
    ===================================================== */
 (() => {
   'use strict';
   const CONFIG = {
-    endpoint: '',                       // e.g. 'https://formspree.io/f/xxxxxxx'
+    endpoint: '/api/book',               // our booking API (api/book.js)
     email: 'info@primeera.us',
     teamTz: 'Asia/Dubai',               // Ras Al Khaimah — all slots are defined in this zone (UTC+4, no DST)
     teamLabel: 'Dubai',
@@ -38,6 +38,7 @@
   ];
   const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const st = { step: 1, topic: null, date: null, slot: null, mode: 'video' };
+  let booked = new Set();             // ISO start times already taken (from the API)
 
   /* ---------- helpers ---------- */
   const pad = n => String(n).padStart(2, '0');
@@ -47,7 +48,7 @@
     return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour % 24, mi: +p.minute };
   };
   const ymd = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
-  const slotInstant = (date, slot) => new Date(`${date}T${slot}:00+05:00`);
+  const slotInstant = (date, slot) => new Date(`${date}T${slot}:00+04:00`);   // team time is Dubai, UTC+4 all year
   const fmtLocalTime = d => new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', timeZone: userTz }).format(d);
   const fmtLocalDay = d => new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long', timeZone: userTz }).format(d);
   const teamDayLabel = d => new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone: CONFIG.teamTz }).format(d);
@@ -66,7 +67,8 @@
     const out = [], minTime = Date.now() + CONFIG.minLeadHours * 3600e3;
     for (let m = CONFIG.startHour * 60; m < CONFIG.endHour * 60; m += CONFIG.slotMinutes) {
       const s = `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
-      if (slotInstant(date, s).getTime() >= minTime) out.push(s);
+      const t = slotInstant(date, s);
+      if (t.getTime() >= minTime && !booked.has(t.toISOString())) out.push(s);
     }
     return out;
   }
@@ -94,6 +96,24 @@
     return `<button type="button" class="bk-day${n ? '' : ' is-full'}" data-date="${date}" ${n ? '' : 'disabled'} aria-pressed="false"><small>${wd}</small><b>${dd}</b><em>${mo}</em></button>`;
   }).join('');
 
+  function refreshDays() {
+    $$('.bk-day', dayBox).forEach(b => {
+      const full = !slotsFor(b.dataset.date).length;
+      b.classList.toggle('is-full', full); b.disabled = full;
+    });
+  }
+  async function loadBooked() {
+    if (!CONFIG.endpoint) return;
+    try {
+      const r = await fetch(CONFIG.endpoint, { headers: { Accept: 'application/json' } });
+      if (!r.ok) return;
+      const d = await r.json();
+      booked = new Set(d.booked || []);
+      if (st.slot && booked.has(slotInstant(st.date, st.slot).toISOString())) { st.slot = null; $('#to3').disabled = true; }
+      refreshDays(); renderSlots(); summary();
+    } catch (e) { /* offline: show every slot, the server re-checks on submit */ }
+  }
+
   function renderSlots() {
     if (!st.date) { slotBox.innerHTML = '<p class="bk-hint">Pick a day to see available times.</p>'; return; }
     const list = slotsFor(st.date);
@@ -114,10 +134,12 @@
   slotBox.addEventListener('click', e => {
     const b = e.target.closest('.bk-slot'); if (!b) return;
     st.slot = b.dataset.s;
+    $('#bkSlotNote').textContent = '';
     $$('.bk-slot', slotBox).forEach(x => { const on = x === b; x.classList.toggle('is-on', on); x.setAttribute('aria-pressed', on); });
     $('#to3').disabled = false; summary();
   });
   renderSlots();
+  loadBooked();
   $('#bkTz').textContent = userTz.replace(/_/g, ' ');
 
   /* ---------- how we meet ---------- */
@@ -178,7 +200,8 @@
       topic: topicLabel, mode: st.mode === 'phone' ? 'Phone call' : 'Video call',
       startUtc: inst.toISOString(), teamTime: `${st.date} ${st.slot} ${CONFIG.teamLabel} (UTC+4)`,
       visitorTime: `${fmtLocalDay(inst)} ${fmtLocalTime(inst)} (${userTz})`,
-      name: val('bName'), email: val('bMail'), phone: val('bPhone'), company: val('bCo'), message: val('bMsg')
+      name: val('bName'), email: val('bMail'), phone: val('bPhone'), company: val('bCo'), message: val('bMsg'),
+      visitorTz: userTz, website: ($('#bWebsite') || {}).value || ''        // 'website' is a hidden honeypot field for bots
     };
     const btn = $('#bkSubmit'); btn.disabled = true; btn.querySelector('.pill__txt').textContent = 'Booking…';
     let delivered = false;
@@ -186,6 +209,14 @@
       try {
         const r = await fetch(CONFIG.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(booking) });
         delivered = r.ok;
+        if (r.status === 409) {                                           // someone took this time a moment ago
+          booked.add(inst.toISOString()); st.slot = null; $('#to3').disabled = true;
+          refreshDays(); renderSlots(); summary(); go(2);
+          $('#bkSlotNote').textContent = 'Sorry — that time was just taken. Please pick another one.';
+          btn.disabled = false; btn.querySelector('.pill__txt').textContent = 'Confirm booking';
+          return;
+        }
+        if (r.status === 429) { note.textContent = 'Too many requests from your connection. Please try again in a little while, or email us.'; btn.disabled = false; btn.querySelector('.pill__txt').textContent = 'Confirm booking'; return; }
       } catch (err) { delivered = false; }
     }
     showDone(booking, inst, delivered);

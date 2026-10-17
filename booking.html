@@ -111,6 +111,7 @@
         <p class="bk-sub">Times are shown in your time zone: <b id="bkTz"></b>. Our team works Monday to Friday, 10:00–18:00 Dubai time (GST, UTC+4).</p>
         <div class="bk-days" id="bkDays" role="group" aria-label="Day"></div>
         <div class="bk-slots" id="bkSlots" role="group" aria-label="Time"></div>
+        <p class="bk-hint" id="bkSlotNote" role="status" style="color:var(--accent)"></p>
         <fieldset class="bk-mode">
           <legend class="mono">How would you like to meet?</legend>
           <label><input type="radio" name="mode" value="video" checked><span>Video call</span></label>
@@ -124,6 +125,7 @@
         <h2>Almost there</h2>
         <p class="bk-sub">So we can confirm your time and come prepared.</p>
         <form id="bkForm" novalidate>
+          <div aria-hidden="true" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden"><label>Leave this empty<input id="bWebsite" type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
           <div class="bk-row">
             <div class="bk-field"><label for="bName">Your name *</label><input id="bName" type="text" autocomplete="name" required></div>
             <div class="bk-field"><label for="bMail">Email *</label><input id="bMail" type="email" autocomplete="email" required></div>
